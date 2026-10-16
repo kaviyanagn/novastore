@@ -86,13 +86,18 @@ export default function ProductCrudPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getProducts({ limit: 8 });
+      const data = await getProducts();
       setProducts(data.products);
       setApiSource(data.source);
-      logRequest("GET", "/products?limit=8", data.status, `Loaded ${data.products.length} products.`);
+      logRequest(
+        "GET",
+        `/products (Total: ${data.products.length})`,
+        data.status,
+        `GET returned ${data.products.length} products (including user-created items).`
+      );
     } catch (err) {
       setError(err.message || "Failed to retrieve products via GET.");
-      logRequest("GET", "/products?limit=8", 500, err.message);
+      logRequest("GET", "/products", err.status || 500, err.message);
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +123,7 @@ export default function ProductCrudPage() {
     setIsSubmitting(true);
     try {
       const result = await addProduct(formData);
-      setProducts((prev) => [result.product, ...prev]);
+      setProducts((prev) => [result.product, ...prev.filter((p) => p.id !== result.product.id)]);
       logRequest("POST", "/products/add", result.status, result.message);
       setIsAddModalOpen(false);
     } catch (err) {

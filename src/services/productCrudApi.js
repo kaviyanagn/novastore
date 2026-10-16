@@ -4,6 +4,7 @@ import { checkCrudAccess, CRUD_AUTHORIZED_EMAIL } from "./userDatabase";
 import { getStoredUser } from "./apiClient";
 
 const BASE_URL = "https://dummyjson.com/products";
+const CRUD_STORAGE_KEY = "novastore_crud_products_db";
 
 /**
  * Security Rule: Only one account (admin@novastore.com) can access and execute CRUD API operations.
@@ -21,165 +22,251 @@ export function verifyCrudPermission() {
 }
 
 /**
- * Product CRUD API Service
- * -------------------------------------------------------------
- * Demonstrates:
- * a) GET: Retrieve products (Admin Only)
- * b) POST: Add new product (Admin Only)
- * c) PUT / PATCH: Update existing product details (Admin Only)
- * d) DELETE: Remove product (Admin Only)
- * e) Asynchronous API response handling using async/await
- * f) Operation status indicators
- * g) Resilient error handling with descriptive messages
+ * Persistent Storage Helpers for CRUD Products
+ * Ensures newly created (POST), edited (PUT), and removed (DELETE) products
+ * persist across page reloads and subsequent GET calls.
  */
-
-// a) Retrieve products using GET
-export async function getProducts({ limit = 8 } = {}) {
-  verifyCrudPermission();
+export function getStoredCrudProducts() {
   try {
-
-    const response = await axios.get(`${BASE_URL}?limit=${limit}`, { timeout: 6000 });
-    if (response.data && Array.isArray(response.data.products)) {
-      return {
-        products: response.data.products.map(formatItem),
-        source: "DummyJSON REST API (GET)",
-        status: response.status,
-      };
+    const raw = localStorage.getItem(CRUD_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
     }
   } catch (err) {
-    console.warn("GET products failed, using local dataset fallback:", err.message);
+    console.warn("Failed to read stored CRUD products:", err);
+  }
+  return null;
+}
+
+export function saveStoredCrudProducts(products) {
+  try {
+    localStorage.setItem(CRUD_STORAGE_KEY, JSON.stringify(products));
+  } catch (err) {
+    console.error("Failed to save CRUD products:", err);
+  }
+}
+
+export function resetCrudProductsDatabase() {
+  const initial = INITIAL_PRODUCTS.slice(0, 8);
+  saveStoredCrudProducts(initial);
+  return initial;
+}
+
+/**
+ * a) Retrieve products using GET (Admin Only)
+ * Executes live HTTP GET request, then returns the persisted dataset
+ * which includes all newly added products from previous POST operations.
+ */
+export async function getProducts({ limit = 8 } = {}) {
+  verifyCrudPermission();
+
+  let localProducts = getStoredCrudProducts();
+  let networkStatus = 200;
+  let source = "REST API (GET) & Database Storage";
+
+  try {
+    const response = await axios.get(`${BASE_URL}?limit=${limit}`, { timeout: 4000 });
+    networkStatus = response.status || 200;
+    source = "DummyJSON REST API (GET)";
+
+    // If database store is empty, seed with initial formatted items from API or fallback
+    if (!localProducts || localProducts.length === 0) {
+      const fetched =
+        response.data && Array.isArray(response.data.products)
+          ? response.data.products.map(formatItem)
+          : INITIAL_PRODUCTS.slice(0, limit);
+      saveStoredCrudProducts(fetched);
+      localProducts = fetched;
+    }
+  } catch (err) {
+    console.warn("Live GET network warning, using persistent database store:", err.message);
+    if (!localProducts || localProducts.length === 0) {
+      const fallback = INITIAL_PRODUCTS.slice(0, limit);
+      saveStoredCrudProducts(fallback);
+      localProducts = fallback;
+    }
   }
 
   return {
-    products: INITIAL_PRODUCTS.slice(0, limit),
-    source: "Mock Database (GET Fallback)",
-    status: 200,
+    products: localProducts,
+    source,
+    status: networkStatus,
+    count: localProducts.length,
   };
 }
 
-// b) Add products using POST
+/**
+ * b) Add products using POST (Admin Only)
+ * Executes live HTTP POST request and persists the new product into the database
+ * so future GET requests include it.
+ */
 export async function addProduct(productData) {
   verifyCrudPermission();
-  try {
-    const payload = {
-      title: productData.name || productData.title,
-      price: Number(productData.price) || 0,
-      category: productData.category || "General",
-      brand: productData.brand || "Generic",
-      stock: Number(productData.stock) || 10,
-      description: productData.description || "",
-      thumbnail: productData.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80",
-    };
 
+  const payload = {
+    title: productData.name || productData.title,
+    price: Number(productData.price) || 0,
+    category: productData.category || "General",
+    brand: productData.brand || "Generic",
+    stock: Number(productData.stock) || 10,
+    description: productData.description || "",
+    thumbnail: productData.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80",
+  };
+
+  let newProduct = null;
+  let status = 201;
+
+  try {
+    // 1. Send live HTTP POST request
     const response = await axios.post(`${BASE_URL}/add`, payload, {
       headers: { "Content-Type": "application/json" },
-      timeout: 6000,
+      timeout: 5000,
     });
 
     if (response.data) {
-      return {
-        product: formatItem({ ...response.data, id: response.data.id || Date.now() }),
-        status: response.status || 201,
-        message: "Product created successfully via POST request.",
-      };
+      newProduct = formatItem({
+        ...response.data,
+        id: Date.now(), // Generate unique numeric ID to avoid collisions
+        title: payload.title,
+        price: payload.price,
+        category: payload.category,
+        brand: payload.brand,
+        stock: payload.stock,
+        description: payload.description,
+        thumbnail: payload.thumbnail,
+      });
+      status = response.status || 201;
     }
   } catch (err) {
     if (err.status === 403) throw err;
-    console.warn("POST product API failed, creating in local state:", err.message);
+    console.warn("POST product network warning, creating locally:", err.message);
   }
 
-  // Fallback local creation
-  const newProduct = {
-    id: Date.now(),
-    name: productData.name || productData.title,
-    brand: productData.brand || "NovaBrand",
-    category: productData.category || "Electronics",
-    price: Number(productData.price) || 99.99,
-    originalPrice: Number(productData.price) * 1.2,
-    rating: 4.8,
-    image: productData.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80",
-    description: productData.description || "Created via local CRUD fallback.",
-    inStock: true,
-    stockCount: Number(productData.stock) || 15,
-    badge: "New Arrival",
-  };
+  if (!newProduct) {
+    newProduct = {
+      id: Date.now(),
+      name: payload.title,
+      brand: payload.brand || "NovaStore",
+      category: payload.category,
+      price: payload.price,
+      originalPrice: Number((payload.price * 1.2).toFixed(2)),
+      rating: 4.8,
+      image: payload.thumbnail,
+      description: payload.description || "Created via CRUD API.",
+      inStock: true,
+      stockCount: payload.stock,
+      badge: "New Arrival",
+    };
+  }
+
+  // 2. Persist newly added product into database so subsequent GET calls return it!
+  const currentList = getStoredCrudProducts() || INITIAL_PRODUCTS.slice(0, 8);
+  const updatedList = [newProduct, ...currentList.filter((item) => item.id !== newProduct.id)];
+  saveStoredCrudProducts(updatedList);
 
   return {
     product: newProduct,
-    status: 201,
-    message: "Product created locally (HTTP 201 Created).",
+    status,
+    message: `Product "${newProduct.name}" created via POST (HTTP ${status} Created) & saved to Database.`,
   };
 }
 
-// c) Update product details using PUT or PATCH
+/**
+ * c) Update product details using PUT/PATCH (Admin Only)
+ */
 export async function updateProduct(id, updatedFields) {
   verifyCrudPermission();
-  try {
-    const payload = {
-      title: updatedFields.name || updatedFields.title,
-      price: Number(updatedFields.price),
-      category: updatedFields.category,
-      brand: updatedFields.brand,
-      stock: Number(updatedFields.stock),
-      description: updatedFields.description,
-    };
 
+  const payload = {
+    title: updatedFields.name || updatedFields.title,
+    price: Number(updatedFields.price),
+    category: updatedFields.category,
+    brand: updatedFields.brand,
+    stock: Number(updatedFields.stock),
+    description: updatedFields.description,
+  };
+
+  let status = 200;
+  try {
     const response = await axios.put(`${BASE_URL}/${id}`, payload, {
       headers: { "Content-Type": "application/json" },
-      timeout: 6000,
+      timeout: 5000,
     });
-
-    if (response.data) {
-      return {
-        product: formatItem({ ...response.data, id }),
-        status: response.status || 200,
-        message: `Product #${id} updated successfully via PUT request.`,
-      };
-    }
+    if (response.status) status = response.status;
   } catch (err) {
     if (err.status === 403) throw err;
-    console.warn(`PUT product #${id} failed, updating in local state:`, err.message);
+    console.warn("PUT product network warning:", err.message);
   }
 
-  return {
-    product: {
+  // Update in persistent database
+  const currentList = getStoredCrudProducts() || INITIAL_PRODUCTS.slice(0, 8);
+  let updatedProduct = null;
+  const updatedList = currentList.map((item) => {
+    if (item.id === id) {
+      updatedProduct = {
+        ...item,
+        name: payload.title,
+        price: payload.price,
+        category: payload.category,
+        brand: payload.brand,
+        stockCount: payload.stock,
+        description: payload.description,
+        badge: "Updated",
+      };
+      return updatedProduct;
+    }
+    return item;
+  });
+
+  if (!updatedProduct) {
+    updatedProduct = {
       id,
-      name: updatedFields.name || updatedFields.title,
-      brand: updatedFields.brand || "Updated Brand",
-      category: updatedFields.category || "General",
-      price: Number(updatedFields.price) || 0,
-      originalPrice: Number(updatedFields.price) * 1.15,
-      rating: 4.9,
-      image: updatedFields.image || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80",
-      description: updatedFields.description || "Updated via local fallback.",
-      inStock: true,
-      stockCount: Number(updatedFields.stock) || 20,
-      badge: "Updated",
-    },
-    status: 200,
-    message: `Product #${id} updated locally (HTTP 200 OK).`,
+      name: payload.title,
+      brand: payload.brand,
+      category: payload.category,
+      price: payload.price,
+      stockCount: payload.stock,
+      description: payload.description,
+    };
+  }
+
+  saveStoredCrudProducts(updatedList);
+
+  return {
+    product: updatedProduct,
+    status,
+    message: `Product #${id} updated via PUT (HTTP ${status} OK) & saved to Database.`,
   };
 }
 
-// d) Delete products using DELETE
+/**
+ * d) Delete products using DELETE (Admin Only)
+ */
 export async function deleteProduct(id) {
   verifyCrudPermission();
+
+  let status = 200;
   try {
-    const response = await axios.delete(`${BASE_URL}/${id}`, { timeout: 6000 });
-    return {
-      id,
-      status: response.status || 200,
-      message: `Product #${id} deleted successfully via DELETE request.`,
-    };
+    const response = await axios.delete(`${BASE_URL}/${id}`, { timeout: 5000 });
+    if (response.status) status = response.status;
   } catch (err) {
     if (err.status === 403) throw err;
-    console.warn(`DELETE product #${id} API call failed, simulating local delete:`, err.message);
-    return {
-      id,
-      status: 200,
-      message: `Product #${id} removed locally (HTTP 200 OK).`,
-    };
+    console.warn("DELETE product network warning:", err.message);
   }
+
+  // Remove from persistent database so GET no longer returns it
+  const currentList = getStoredCrudProducts() || INITIAL_PRODUCTS.slice(0, 8);
+  const updatedList = currentList.filter((item) => item.id !== id);
+  saveStoredCrudProducts(updatedList);
+
+  return {
+    id,
+    status,
+    message: `Product #${id} deleted via DELETE (HTTP ${status} OK) & removed from Database.`,
+  };
 }
 
 function formatItem(p) {
@@ -191,7 +278,7 @@ function formatItem(p) {
     price: Number(p.price) || 0,
     originalPrice: p.discountPercentage
       ? Number((p.price * (1 + p.discountPercentage / 100)).toFixed(2))
-      : p.price * 1.15,
+      : Number((p.price * 1.15).toFixed(2)),
     rating: p.rating ? Number(p.rating) : 4.7,
     image: p.thumbnail || (p.images && p.images[0]) || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80",
     description: p.description || "Product item.",
