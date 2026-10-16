@@ -21,8 +21,10 @@ export function registerServiceWorker() {
 
   // In production only: register the service worker
   window.addEventListener('load', () => {
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    const swPath = `${baseUrl}sw.js`.replace(/\/+/g, '/');
     navigator.serviceWorker
-      .register('/sw.js')
+      .register(swPath)
       .then((registration) => {
         console.log('[PWA] Service Worker registered in production:', registration.scope);
       })
