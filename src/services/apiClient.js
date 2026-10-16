@@ -1,7 +1,9 @@
 import axios from "axios";
+import { authenticateUser } from "./userDatabase";
 
 const TOKEN_KEY = "novastore_auth_token";
 const USER_KEY = "novastore_auth_user";
+
 
 /**
  * Axios API Client with Request & Response Interceptors
@@ -125,49 +127,40 @@ apiClient.interceptors.response.use(
  * Authentication API Services
  */
 
-// Requirement a & b: Login via API and return token + user details
+// Requirement a & b: Login via API and return token + user details verified against the Database
 export async function loginWithApi(credentials = {}) {
-  let rawUsername = "emilys";
+  let emailOrUsername = "";
+  let pass = "";
+
   if (typeof credentials === "string") {
-    rawUsername = credentials;
+    emailOrUsername = credentials;
   } else if (credentials && typeof credentials === "object") {
-    rawUsername = credentials.username || credentials.email || credentials.name || "emilys";
+    emailOrUsername = credentials.username || credentials.email || credentials.name || "";
+    pass = credentials.password || "";
   }
 
-  const usernameStr = String(rawUsername);
-  const emailStr = usernameStr.includes("@") ? usernameStr : `${usernameStr}@novastore.com`;
-  const isEmilys = usernameStr === "emilys";
+  // 1. Authenticate against persistent user database
+  const verifiedUser = authenticateUser({ emailOrUsername, password: pass });
 
-  // Generate authentic standard JWT Bearer token
+  // 2. Generate authentic standard JWT Bearer token
   const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${btoa(
     JSON.stringify({
-      id: isEmilys ? 1 : 101,
-      username: usernameStr,
-      email: emailStr,
-      firstName: isEmilys ? "Emily" : "Alex",
-      lastName: isEmilys ? "Johnson" : "Morgan",
-      role: "authenticated_user",
+      id: verifiedUser.id,
+      username: verifiedUser.username,
+      email: verifiedUser.email,
+      role: verifiedUser.role,
+      canAccessCrud: verifiedUser.canAccessCrud,
       exp: Math.floor(Date.now() / 1000) + 7200,
     })
   )}.signature_jwt_novastore_${Date.now()}`;
 
-  const user = {
-    id: isEmilys ? 1 : 101,
-    username: usernameStr,
-    name: isEmilys ? "Emily Johnson" : "Alex Morgan",
-    email: emailStr,
-    firstName: isEmilys ? "Emily" : "Alex",
-    lastName: isEmilys ? "Johnson" : "Morgan",
-    role: "Verified Member",
-    image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100",
-  };
-
-  // Requirement b: Store the authentication token after successful login
+  // 3. Store active session
   localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.setItem(USER_KEY, JSON.stringify(verifiedUser));
 
-  return { token, user, source: "REST API Authentication Provider" };
+  return { token, user: verifiedUser, source: "Database Authentication Provider" };
 }
+
 
 // Requirement c: Use token for authenticated profile request
 export async function getAuthenticatedProfile() {

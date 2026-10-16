@@ -7,6 +7,13 @@ import {
   setAuthExpiredHandler,
 } from "../services/apiClient";
 
+import {
+  registerUser,
+  getDatabaseUsers,
+  checkCrudAccess,
+  CRUD_AUTHORIZED_EMAIL,
+} from "../services/userDatabase";
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -16,7 +23,7 @@ export function AuthProvider({ children }) {
   const [authError, setAuthError] = useState(null);
   const [expiredNotice, setExpiredNotice] = useState(null);
 
-  // Requirement g: Handle invalid or expired token caught by Axios Interceptor
+  // Handle invalid or expired token caught by Axios Interceptor
   useEffect(() => {
     setAuthExpiredHandler((notice) => {
       setToken(null);
@@ -25,34 +32,28 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
-  // Requirement a & b: Login via API and store token
+  // Authenticate user against persistent database
   const login = async (usernameOrUser, password) => {
     setIsLoading(true);
     setAuthError(null);
     setExpiredNotice(null);
 
     try {
-      let username = "alex.morgan@novastore.com";
-      let pass = password || "password123";
+      let username = "";
+      let pass = password || "";
 
       if (typeof usernameOrUser === "string") {
         username = usernameOrUser;
       } else if (usernameOrUser && typeof usernameOrUser === "object") {
-        username = usernameOrUser.email || usernameOrUser.username || usernameOrUser.name || username;
+        username = usernameOrUser.email || usernameOrUser.username || usernameOrUser.name || "";
         pass = usernameOrUser.password || pass;
       }
 
       const data = await loginWithApi({ username, password: pass });
 
-      const finalUser =
-        usernameOrUser && typeof usernameOrUser === "object"
-          ? { ...data.user, ...usernameOrUser }
-          : data.user;
-
       setToken(data.token);
-      setUser(finalUser);
-      localStorage.setItem("novastore_auth_user", JSON.stringify(finalUser));
-      return { token: data.token, user: finalUser };
+      setUser(data.user);
+      return data;
     } catch (err) {
       setAuthError(err.message || "Login failed");
       throw err;
@@ -61,7 +62,22 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Requirement f: Logout and remove token
+  // Register new customer in database and log in
+  const register = async ({ name, email, password }) => {
+    setIsLoading(true);
+    setAuthError(null);
+    try {
+      const newUser = registerUser({ name, email, password });
+      return await login(newUser.email, password);
+    } catch (err) {
+      setAuthError(err.message || "Registration failed");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Logout and remove token
   const logout = () => {
     clearAuthToken();
     setToken(null);
@@ -69,12 +85,14 @@ export function AuthProvider({ children }) {
     setExpiredNotice(null);
   };
 
-  // Requirement g: Method to simulate expired token
+  // Method to simulate expired token
   const simulateExpireToken = () => {
     localStorage.setItem("novastore_auth_token", "invalid_expired_token_mock");
     setToken("invalid_expired_token_mock");
     setExpiredNotice("Token has been manually invalidated for testing!");
   };
+
+  const isCrudAuthorized = checkCrudAccess(user);
 
   return (
     <AuthContext.Provider
@@ -82,19 +100,24 @@ export function AuthProvider({ children }) {
         user,
         token,
         isAuthenticated: Boolean(token && user),
+        isCrudAuthorized,
+        crudAuthorizedEmail: CRUD_AUTHORIZED_EMAIL,
         isLoading,
         authError,
         expiredNotice,
         setExpiredNotice,
         login,
+        register,
         logout,
         simulateExpireToken,
+        getDatabaseUsers,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
+
 
 export function useAuth() {
   const context = useContext(AuthContext);

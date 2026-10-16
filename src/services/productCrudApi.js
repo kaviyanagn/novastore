@@ -1,16 +1,33 @@
 import axios from "axios";
 import { INITIAL_PRODUCTS } from "../data/products";
+import { checkCrudAccess, CRUD_AUTHORIZED_EMAIL } from "./userDatabase";
+import { getStoredUser } from "./apiClient";
 
 const BASE_URL = "https://dummyjson.com/products";
+
+/**
+ * Security Rule: Only one account (admin@novastore.com) can access and execute CRUD API operations.
+ */
+export function verifyCrudPermission() {
+  const activeUser = getStoredUser();
+  if (!activeUser || !checkCrudAccess(activeUser)) {
+    const error = new Error(
+      `403 Forbidden: Access denied. Only the single designated Administrator account (${CRUD_AUTHORIZED_EMAIL}) is permitted to access the CRUD API.`
+    );
+    error.status = 403;
+    throw error;
+  }
+  return true;
+}
 
 /**
  * Product CRUD API Service
  * -------------------------------------------------------------
  * Demonstrates:
- * a) GET: Retrieve products
- * b) POST: Add new product
- * c) PUT / PATCH: Update existing product details
- * d) DELETE: Remove product
+ * a) GET: Retrieve products (Admin Only)
+ * b) POST: Add new product (Admin Only)
+ * c) PUT / PATCH: Update existing product details (Admin Only)
+ * d) DELETE: Remove product (Admin Only)
  * e) Asynchronous API response handling using async/await
  * f) Operation status indicators
  * g) Resilient error handling with descriptive messages
@@ -18,7 +35,9 @@ const BASE_URL = "https://dummyjson.com/products";
 
 // a) Retrieve products using GET
 export async function getProducts({ limit = 8 } = {}) {
+  verifyCrudPermission();
   try {
+
     const response = await axios.get(`${BASE_URL}?limit=${limit}`, { timeout: 6000 });
     if (response.data && Array.isArray(response.data.products)) {
       return {
@@ -40,6 +59,7 @@ export async function getProducts({ limit = 8 } = {}) {
 
 // b) Add products using POST
 export async function addProduct(productData) {
+  verifyCrudPermission();
   try {
     const payload = {
       title: productData.name || productData.title,
@@ -64,6 +84,7 @@ export async function addProduct(productData) {
       };
     }
   } catch (err) {
+    if (err.status === 403) throw err;
     console.warn("POST product API failed, creating in local state:", err.message);
   }
 
@@ -92,6 +113,7 @@ export async function addProduct(productData) {
 
 // c) Update product details using PUT or PATCH
 export async function updateProduct(id, updatedFields) {
+  verifyCrudPermission();
   try {
     const payload = {
       title: updatedFields.name || updatedFields.title,
@@ -115,6 +137,7 @@ export async function updateProduct(id, updatedFields) {
       };
     }
   } catch (err) {
+    if (err.status === 403) throw err;
     console.warn(`PUT product #${id} failed, updating in local state:`, err.message);
   }
 
@@ -140,6 +163,7 @@ export async function updateProduct(id, updatedFields) {
 
 // d) Delete products using DELETE
 export async function deleteProduct(id) {
+  verifyCrudPermission();
   try {
     const response = await axios.delete(`${BASE_URL}/${id}`, { timeout: 6000 });
     return {
@@ -148,6 +172,7 @@ export async function deleteProduct(id) {
       message: `Product #${id} deleted successfully via DELETE request.`,
     };
   } catch (err) {
+    if (err.status === 403) throw err;
     console.warn(`DELETE product #${id} API call failed, simulating local delete:`, err.message);
     return {
       id,

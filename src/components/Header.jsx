@@ -46,8 +46,9 @@ export default function Header({
   toggleTheme,
   onOpenCart,
 }) {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, isCrudAuthorized } = useAuth();
   const cartContext = useCart();
+
   const navigate = useNavigate();
 
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
@@ -185,21 +186,14 @@ export default function Header({
                   <Package className="w-3.5 h-3.5" />
                   <span>Products</span>
                 </NavLink>
-                <NavLink to="/api-products" className={navLinkClass}>
-                  <Database className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>REST API</span>
-                </NavLink>
-                <NavLink to="/redux-store" className={navLinkClass}>
-                  <Layers className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Redux Store</span>
-                </NavLink>
-                <NavLink to="/crud" className={navLinkClass}>
+                <NavLink
+                  to="/crud"
+                  className={navLinkClass}
+                  title={isCrudAuthorized ? "CRUD API (Authorized Administrator)" : "CRUD API (Single Admin Account Only)"}
+                >
                   <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                   <span>CRUD APIs</span>
-                </NavLink>
-                <NavLink to="/auth-token" className={navLinkClass}>
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Auth Token</span>
+                  {!isCrudAuthorized && <Lock className="w-2.5 h-2.5 text-amber-400/80" />}
                 </NavLink>
                 <NavLink to="/cart" className={navLinkClass}>
                   <ShoppingBag className="w-3.5 h-3.5" />

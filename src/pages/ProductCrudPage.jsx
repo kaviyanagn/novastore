@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
   Edit2,
@@ -17,6 +18,12 @@ import {
   Sparkles,
   DollarSign,
   Package,
+  ShieldAlert,
+  ShieldCheck,
+  Lock,
+  KeyRound,
+  ArrowRight,
+  LogOut,
 } from "lucide-react";
 import {
   getProducts,
@@ -25,12 +32,17 @@ import {
   deleteProduct,
 } from "../services/productCrudApi";
 import Loading from "../components/Loading";
+import { useAuth } from "../context/AuthContext";
 
 export default function ProductCrudPage() {
+  const { user, isAuthenticated, isCrudAuthorized, crudAuthorizedEmail } = useAuth();
+  const navigate = useNavigate();
+
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [apiSource, setApiSource] = useState("");
+
 
   // Operation specific loading states (Requirement f)
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,8 +99,12 @@ export default function ProductCrudPage() {
   }
 
   useEffect(() => {
-    fetchProductsList();
-  }, []);
+    if (isCrudAuthorized) {
+      fetchProductsList();
+    } else {
+      setIsLoading(false);
+    }
+  }, [isCrudAuthorized]);
 
   // Requirement b & e: Add products using POST
   async function handleCreateProduct(e) {
@@ -162,8 +178,127 @@ export default function ProductCrudPage() {
     });
   }
 
+  // 1. Guard: Authentication Required
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full p-8 rounded-3xl border border-neutral-800 bg-[#141418] shadow-2xl text-center space-y-6">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/10">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-black">
+              Authentication Required
+            </span>
+            <h2 className="text-2xl font-black text-white">CRUD API Access Restricted</h2>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              Access to Product CRUD APIs is strictly protected. Only the single authorized Administrator account (<code className="text-amber-400 font-mono font-bold">{crudAuthorizedEmail}</code>) is permitted to access this page and execute operations.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 text-left text-xs space-y-2">
+            <div className="flex items-center gap-2 text-neutral-300 font-bold">
+              <KeyRound className="w-4 h-4 text-amber-400" />
+              <span>Single Account Authorization Policy</span>
+            </div>
+            <p className="text-neutral-400 text-[11px] leading-relaxed">
+              All user accounts are stored in the database and verified during login. Only <code className="text-amber-300 font-bold font-mono">admin@novastore.com</code> possesses CRUD API privileges.
+            </p>
+          </div>
+
+          <button
+            onClick={() => navigate("/login", { state: { from: { pathname: "/crud" } } })}
+            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-neutral-950 font-black text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
+          >
+            <span>Sign In with Admin Account</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Guard: Only ONE account is authorized for CRUD API
+  if (!isCrudAuthorized) {
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center px-4 py-12">
+        <div className="max-w-lg w-full p-8 rounded-3xl border border-rose-500/30 bg-[#161214] shadow-2xl text-center space-y-6">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-400 flex items-center justify-center shadow-lg shadow-rose-500/10">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+              <span>HTTP 403 Forbidden • Access Denied</span>
+            </div>
+            <h2 className="text-2xl font-black text-white">Single-Account CRUD Restriction</h2>
+            <p className="text-xs text-neutral-400 leading-relaxed">
+              System security strictly limits CRUD API operations (GET, POST, PUT, DELETE) to <span className="text-rose-300 font-bold">only one designated administrator account</span>.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-neutral-950 border border-neutral-800 text-left text-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-neutral-850 pb-2">
+              <span className="text-neutral-500">Your Current Account:</span>
+              <span className="font-mono text-neutral-200 font-bold">{user?.email}</span>
+            </div>
+            <div className="flex items-center justify-between border-b border-neutral-850 pb-2">
+              <span className="text-neutral-500">Your Account Role:</span>
+              <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 text-[11px] font-mono">
+                {user?.role || "Customer"} (CRUD Restricted)
+              </span>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-amber-400 font-bold">Authorized Account:</span>
+              <span className="font-mono text-amber-300 font-bold bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/30">
+                {crudAuthorizedEmail}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+            <button
+              onClick={() => navigate("/login", { state: { from: { pathname: "/crud" } } })}
+              className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-neutral-950 font-black text-xs shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>Switch to Admin Account</span>
+            </button>
+
+            <Link
+              to="/products"
+              className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+            >
+              <span>Back to Store Catalog</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0b0b0e] text-neutral-100 py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
+      {/* Authorized Admin Single-Account Badge */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-transparent border border-emerald-500/40 text-xs flex flex-wrap items-center justify-between gap-3 shadow-lg shadow-emerald-500/5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 font-bold">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-black text-white">CRUD API Single-Account Access Granted</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-400 text-neutral-950">
+                Exclusive Authorized Account
+              </span>
+            </div>
+            <p className="text-[11px] text-emerald-300/90">
+              Authenticated as <strong className="text-white font-mono">{user?.email}</strong>. Only this designated database account has permissions to execute GET, POST, PUT, DELETE operations on the CRUD API.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Header Banner */}
       <div className="p-6 md:p-8 rounded-3xl border border-neutral-800 bg-gradient-to-r from-neutral-900/90 via-[#13121a] to-black shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2">
