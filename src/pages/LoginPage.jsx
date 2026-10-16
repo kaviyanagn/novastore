@@ -17,7 +17,6 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  Users,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Input from "../components/Input";
@@ -31,7 +30,6 @@ import { logClientAction } from "../utils/logger";
  * - Credentials verified against persistent User Database (IndexedDB & LocalDB)
  * - User Registration: Saves new user accounts into the database
  * - Single-Account CRUD Access Rule: Only admin@novastore.com has access to the CRUD API
- * - Interactive Database Registry viewer displaying stored users and permissions
  * - ErrorBoundary demonstration trigger
  */
 export default function LoginPage() {
@@ -45,8 +43,8 @@ export default function LoginPage() {
     isAuthenticated,
     isCrudAuthorized,
     crudAuthorizedEmail,
-    getDatabaseUsers,
   } = useAuth();
+
 
   // Target destination route if redirected from ProtectedRoute
   const from = location.state?.from?.pathname || "/cart";
@@ -56,9 +54,10 @@ export default function LoginPage() {
 
   // Controlled form state for Login
   const [loginData, setLoginData] = useState({
-    email: "admin@novastore.com",
-    password: "admin123",
+    email: "",
+    password: "",
   });
+
 
   // Controlled form state for Register
   const [registerData, setRegisterData] = useState({
@@ -75,19 +74,6 @@ export default function LoginPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [triggerError, setTriggerError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showDbRegistry, setShowDbRegistry] = useState(false);
-  const [dbUsersList, setDbUsersList] = useState([]);
-
-  // Refresh DB users list
-  const refreshDbUsers = () => {
-    if (getDatabaseUsers) {
-      setDbUsersList(getDatabaseUsers());
-    }
-  };
-
-  useEffect(() => {
-    refreshDbUsers();
-  }, [isAuthenticated, tabMode]);
 
   // ErrorBoundary test trigger
   if (triggerError) {
@@ -171,7 +157,6 @@ export default function LoginPage() {
       setSuccessMessage(
         `Welcome back, ${result.user.name}! Database credentials verified.`
       );
-      refreshDbUsers();
 
       setTimeout(() => {
         navigate(from, { replace: true });
@@ -215,7 +200,6 @@ export default function LoginPage() {
       setSuccessMessage(
         `Account created successfully and stored in the database! Signed in as ${result.user.name}.`
       );
-      refreshDbUsers();
 
       setTimeout(() => {
         navigate(from, { replace: true });
@@ -227,14 +211,6 @@ export default function LoginPage() {
         form: err.message || "Failed to create user in database.",
       }));
     }
-  };
-
-  const handleQuickDemo = (demoEmail, demoPass) => {
-    setLoginData({
-      email: demoEmail,
-      password: demoPass,
-    });
-    setErrors({});
   };
 
   return (
@@ -445,48 +421,6 @@ export default function LoginPage() {
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
-
-            {/* Quick Demo Pre-fill helper buttons */}
-            <div className="pt-3 border-t border-neutral-800 text-center space-y-2">
-              <span className="text-[11px] text-neutral-400 block font-medium">
-                Test Accounts Stored in Database:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemo("admin@novastore.com", "admin123")}
-                  className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-850 text-neutral-300 border border-emerald-500/40 text-[11px] text-left cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center justify-between font-bold text-emerald-400">
-                    <span>👑 Admin Account</span>
-                    <span className="text-[9px] bg-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
-                      CRUD Allowed
-                    </span>
-                  </div>
-                  <div className="text-[10px] font-mono text-neutral-400 mt-0.5">
-                    admin@novastore.com
-                  </div>
-                  <div className="text-[9px] text-neutral-500 font-mono">Pass: admin123</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemo("customer@novastore.com", "password123")}
-                  className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-850 text-neutral-300 border border-neutral-700 text-[11px] text-left cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center justify-between font-bold text-neutral-300">
-                    <span>👤 Customer Account</span>
-                    <span className="text-[9px] bg-neutral-800 px-1.5 py-0.5 rounded font-mono text-neutral-400">
-                      CRUD Blocked
-                    </span>
-                  </div>
-                  <div className="text-[10px] font-mono text-neutral-400 mt-0.5">
-                    customer@novastore.com
-                  </div>
-                  <div className="text-[9px] text-neutral-500 font-mono">Pass: password123</div>
-                </button>
-              </div>
-            </div>
           </form>
         ) : (
           /* ================= REGISTER FORM ================= */
@@ -569,67 +503,6 @@ export default function LoginPage() {
             </div>
           </form>
         )}
-
-        {/* Database User Registry Collapsible Viewer */}
-        <div className="pt-4 border-t border-neutral-800/80">
-          <button
-            type="button"
-            onClick={() => {
-              refreshDbUsers();
-              setShowDbRegistry(!showDbRegistry);
-            }}
-            className="w-full flex items-center justify-between text-xs text-neutral-400 hover:text-white transition-colors cursor-pointer py-1"
-          >
-            <span className="flex items-center gap-2 font-bold">
-              <Users className="w-4 h-4 text-cyan-400" />
-              <span>Inspect Database User Registry ({dbUsersList.length} accounts stored)</span>
-            </span>
-            <span className="text-[11px] font-mono text-cyan-400 underline">
-              {showDbRegistry ? "Hide DB" : "View DB"}
-            </span>
-          </button>
-
-          {showDbRegistry && (
-            <div className="mt-3 p-3.5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-2.5 animate-fade-in text-xs">
-              <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono border-b border-neutral-850 pb-1.5">
-                <span>Stored Account</span>
-                <span>CRUD Access</span>
-              </div>
-              {dbUsersList.map((dbUser) => {
-                const isAdmin = dbUser.email?.toLowerCase() === crudAuthorizedEmail?.toLowerCase();
-                return (
-                  <div
-                    key={dbUser.id || dbUser.email}
-                    className="flex items-center justify-between p-2 rounded-xl bg-neutral-900 border border-neutral-800"
-                  >
-                    <div>
-                      <div className="font-bold text-white text-xs flex items-center gap-1.5">
-                        <span>{dbUser.name}</span>
-                        {isAdmin && (
-                          <span className="text-[9px] bg-amber-400 text-neutral-950 px-1 rounded font-black">
-                            ADMIN
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-neutral-400 font-mono">{dbUser.email}</div>
-                    </div>
-                    <div>
-                      {isAdmin ? (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black font-mono">
-                          ⭐ Authorized
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 text-[10px] font-mono">
-                          Restricted
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
         {/* ErrorBoundary Demonstration Trigger */}
         <div className="pt-2 border-t border-neutral-800/80">
