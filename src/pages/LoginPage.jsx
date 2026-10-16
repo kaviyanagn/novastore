@@ -403,8 +403,9 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-9 text-neutral-400 hover:text-white cursor-pointer"
+                className="absolute right-3.5 top-8.5 z-10 p-1 rounded-lg text-neutral-400 hover:text-amber-400 bg-neutral-900/80 hover:bg-neutral-800 transition-colors cursor-pointer"
                 title={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -459,31 +460,53 @@ export default function LoginPage() {
               required
             />
 
-            <Input
-              label="Password"
-              name="password"
-              type="password"
-              icon={Lock}
-              value={registerData.password}
-              onChange={handleRegisterChange}
-              onBlur={() => validateField("password", registerData.password, true)}
-              placeholder="Minimum 6 characters"
-              error={touched.password ? errors.password : ""}
-              required
-            />
+            <div className="relative">
+              <Input
+                label="Password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                icon={Lock}
+                value={registerData.password}
+                onChange={handleRegisterChange}
+                onBlur={() => validateField("password", registerData.password, true)}
+                placeholder="Minimum 6 characters"
+                error={touched.password ? errors.password : ""}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-8.5 z-10 p-1 rounded-lg text-neutral-400 hover:text-amber-400 bg-neutral-900/80 hover:bg-neutral-800 transition-colors cursor-pointer"
+                title={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
 
-            <Input
-              label="Confirm Password"
-              name="confirmPassword"
-              type="password"
-              icon={Lock}
-              value={registerData.confirmPassword}
-              onChange={handleRegisterChange}
-              onBlur={() => validateField("confirmPassword", registerData.confirmPassword, true)}
-              placeholder="Re-enter password"
-              error={touched.confirmPassword ? errors.confirmPassword : ""}
-              required
-            />
+            <div className="relative">
+              <Input
+                label="Confirm Password"
+                name="confirmPassword"
+                type={showPassword ? "text" : "password"}
+                icon={Lock}
+                value={registerData.confirmPassword}
+                onChange={handleRegisterChange}
+                onBlur={() => validateField("confirmPassword", registerData.confirmPassword, true)}
+                placeholder="Re-enter password"
+                error={touched.confirmPassword ? errors.confirmPassword : ""}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-8.5 z-10 p-1 rounded-lg text-neutral-400 hover:text-amber-400 bg-neutral-900/80 hover:bg-neutral-800 transition-colors cursor-pointer"
+                title={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
 
             <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 text-[11px] text-neutral-400 leading-relaxed">
               <strong className="text-amber-400 font-bold block mb-1">Single Account Security Policy:</strong>
