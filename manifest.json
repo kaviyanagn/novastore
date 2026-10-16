@@ -1,0 +1,18 @@
+{
+  "name": "NovaStore E-Commerce Experience",
+  "short_name": "NovaStore",
+  "description": "High-performance, accessible, and secure e-commerce application",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0b0e",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

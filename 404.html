@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>NovaStore</title>
+    <script>
+      /**
+       * GitHub Pages SPA Routing Fix
+       * ─────────────────────────────
+       * GitHub Pages serves a real 404 for any route that isn't a physical file.
+       * This 404.html intercepts the request, encodes the path into a query string,
+       * and redirects to index.html — which then decodes it back via the script below.
+       *
+       * Technique by: rafgraph/spa-github-pages
+       */
+      var pathSegmentsToKeep = 1; // Number of path segments for the repo name
+      var l = window.location;
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body>
+    Redirecting...
+  </body>
+</html>
